@@ -49,13 +49,16 @@ useEffect(() => {
     setErro("");
 
     try {
+      console.log("Tentando fazer login com:", { email, AUTH_MODE });
       const { data } = await api.post("/auth/login", { email, password });
+      console.log("Resposta do servidor:", data);
       
       if (AUTH_MODE === "BASIC") {
-        // Backend retorna apenas { user } no modo BASIC (sem token)
+        // Backend retorna apenas { usuario } no modo BASIC (sem token)
         const user = data.user || data.usuario;
         
         if (!user) {
+          console.error("Resposta sem user/usuario:", data);
           setErro("Resposta do servidor inválida");
           return;
         }
@@ -67,6 +70,8 @@ useEffect(() => {
           role: user.role,
           atletaId: user.atletaId || null,
         } as JwtPayload;
+
+        console.log("Usuário final:", usuarioFinal);
 
         // Seta usuario e credenciais
         setUsuario(usuarioFinal);
@@ -90,9 +95,26 @@ useEffect(() => {
       setUsuario(decoded);
       navigate(getRedirectRoute(decoded.role));
     } catch (err: unknown) {
+      console.error("Erro no login:", err);
       if (isAxiosError(err)) {
-        if (err.response?.data?.mensagem) setErro(err.response.data.mensagem);
-        else setErro("Erro inesperado no servidor.");
+        console.error("Erro axios:", {
+          status: err.response?.status,
+          data: err.response?.data,
+          message: err.message
+        });
+        
+        // Trata diferentes formatos de erro do backend
+        if (err.response?.data?.mensagem) {
+          setErro(err.response.data.mensagem);
+        } else if (err.response?.data?.error) {
+          setErro(err.response.data.error);
+        } else if (err.response?.data?.message) {
+          setErro(err.response.data.message);
+        } else if (err.message) {
+          setErro(err.message);
+        } else {
+          setErro(`Erro ${err.response?.status || 'desconhecido'} - Verifique se a API está funcionando.`);
+        }
       } else {
         setErro("Erro desconhecido.");
       }
