@@ -1,72 +1,86 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
-import axios, { isAxiosError } from 'axios';
-import { jwtDecode } from 'jwt-decode';
-import { useAuth } from '../context/AuthContext';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
+import { useAuth } from "../context/AuthContext";
+import { isAxiosError } from "axios";
+import { api, setBasicCreds } from "@/lib/api";
 
 type JwtPayload = {
-  id: number;
-  name: string;
-  email: string;
+  id: number | string;
+  name?: string;
+  email?: string;
   role: string;
-  iat: number;
-  exp: number;
+  iat?: number;
+  exp?: number;
 };
 
+const AUTH_MODE = (import.meta.env.VITE_AUTH_MODE || "JWT").toUpperCase();
+
+function getRedirectRoute(role: string): string {
+  if (role === "ADMIN") return "/dashboard";
+  if (role === "USER") return "/perfil";
+  return "/unauthorized";
+}
+
 const LoginForm = () => {
-  const [email, setEmail] = useState('');
-  const [password, setSenha] = useState('');
-  const [erro, setErro] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setSenha] = useState("");
+  const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
   const navigate = useNavigate();
   const { setUsuario } = useAuth();
 
-  function getRedirectRoute(role: string): string {
-  if (role === 'ADMIN') return '/dashboard';
-  if (role === 'USER') return '/perfil';
-  return '/unauthorized';
-}
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      navigate('/dashboard');
+useEffect(() => {
+  const MODE = (import.meta.env.VITE_AUTH_MODE || "JWT").toUpperCase();
+  if (MODE === "BASIC") {
+    const raw = localStorage.getItem("usuario");
+    if (raw) {
+      const u = JSON.parse(raw);
+      navigate(getRedirectRoute(u.role), { replace: true });
     }
-  }, []);
-
+  } else {
+    const token = localStorage.getItem("token");
+    if (token) navigate("/dashboard", { replace: true });
+  }
+}, [navigate]);
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setCarregando(true);
-    setErro('');
+    setErro("");
 
     try {
+      const { data } = await api.post("/auth/login", { email, password });
+      const { token, usuario } = data; // backend já envia `usuario` no BASIC e no JWT (conforme sugerido)
 
-      const response = await axios.post('http://localhost:3000/auth/login', {
-        email,
-        password,
-      });
+      localStorage.setItem("token", token);
 
-      const { token, usuario } = response.data;
-      localStorage.setItem('token', token);
-      
-      const decoded = jwtDecode<JwtPayload>(token);
-      setUsuario(decoded); // <- atualizar o contexto imediatamente
+      if (AUTH_MODE === "BASIC") {
+        // 1) Não decodifica token fake
+        // 2) Seta usuario vindo do backend
+        // 3) Injeta credenciais no axios (apenas em memória)
+        
+        const usuarioFinal = usuario as JwtPayload;
+        console.log(usuarioFinal);
 
-      console.log('Usuário logado:', decoded.name);
+        setUsuario(usuarioFinal);
+        localStorage.setItem("usuario", JSON.stringify(usuarioFinal)); // ajuda a reidratar após refresh
+        setBasicCreds({ email: email.trim().toLowerCase(), senha: password });
 
-      navigate(getRedirectRoute(decoded.role));
-      //navigate('/dashboard');
-    } catch (err: unknown) {
-    if (axios.isAxiosError(err)) {
-      if (err.response?.data?.mensagem) {
-        setErro(err.response.data.mensagem);
-      } else {
-        setErro('Erro inesperado no servidor.');
+        navigate(getRedirectRoute(usuarioFinal.role), { replace: true });
+        return;
       }
-    } else {
-      setErro('Erro desconhecido.');
-    }
+
+      // JWT: decodifica normalmente
+      const decoded = jwtDecode<JwtPayload>(token);
+      setUsuario(decoded);
+      navigate(getRedirectRoute(decoded.role));
+    } catch (err: unknown) {
+      if (isAxiosError(err)) {
+        if (err.response?.data?.mensagem) setErro(err.response.data.mensagem);
+        else setErro("Erro inesperado no servidor.");
+      } else {
+        setErro("Erro desconhecido.");
+      }
     } finally {
       setCarregando(false);
     }
@@ -93,14 +107,14 @@ const LoginForm = () => {
           style={styles.input}
         />
         <button type="submit" disabled={carregando} style={styles.button}>
-          {carregando ? 'Entrando...' : 'Entrar'}
+          {carregando ? "Entrando..." : "Entrar"}
         </button>
         {erro && <p style={styles.erro}>{erro}</p>}
       </form>
       <p className="mt-4 text-center">
-        Não tem conta?{' '}
+        Não tem conta?{" "}
         <a href="/criar-conta" className="text-blue-600 hover:underline">
-           Criar conta
+          Criar conta
         </a>
       </p>
     </div>
@@ -109,31 +123,31 @@ const LoginForm = () => {
 
 const styles = {
   container: {
-    maxWidth: '400px',
-    margin: '50px auto',
-    padding: '20px',
-    border: '1px solid #ccc',
-    borderRadius: '10px',
-    textAlign: 'center' as const,
-    fontFamily: 'Arial, sans-serif',
+    maxWidth: "400px",
+    margin: "50px auto",
+    padding: "20px",
+    border: "1px solid #ccc",
+    borderRadius: "10px",
+    textAlign: "center" as const,
+    fontFamily: "Arial, sans-serif",
   },
   form: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '10px',
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "10px",
   },
   input: {
-    padding: '10px',
-    fontSize: '16px',
+    padding: "10px",
+    fontSize: "16px",
   },
   button: {
-    padding: '10px',
-    fontSize: '16px',
-    cursor: 'pointer',
+    padding: "10px",
+    fontSize: "16px",
+    cursor: "pointer",
   },
   erro: {
-    color: 'red',
-    marginTop: '10px',
+    color: "red",
+    marginTop: "10px",
   },
 };
 

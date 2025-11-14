@@ -1,32 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import NovaPartidaModal from "./NovaPartidaModal";
-
-interface Atleta {
-  id: string;
-  nome: string;
-}
-interface Partida {
-  id: string;
-  data: string;
-  local: string;
-  atleta1?: Atleta;
-  atleta2?: Atleta;
-  atleta3?: Atleta;
-  atleta4?: Atleta;
-  gamesTime1: number | null;
-  gamesTime2: number | null;
-  tiebreakTime1?: number | null;
-  tiebreakTime2?: number | null;
-}
+import type { Partida } from "@/types/domain";
+import { apiUrl } from "@/lib/url";
 
 interface Props {
   token: string;
-  partidas: Partida[]; // já filtradas/ordenadas no pai
+  partidas: Partida[];
   onAbrirTodas: () => void;
   onAtualizarPlacar: (partida: Partida) => void;
   atletaId: string;
-  onNovaPartida: () => void; // recarrega após salvar
-  pageSize?: number;         // padrão 5
+  onNovaPartida: () => void;
+  pageSize?: number;
 }
 
 export default function MinhasPartidasCompacta({
@@ -42,7 +26,6 @@ export default function MinhasPartidasCompacta({
   const [novaAberta, setNovaAberta] = useState(false);
   const [page, setPage] = useState(1);
 
-  // se a quantidade mudar e a página ficar fora do range, ajusta
   const totalPages = Math.max(1, Math.ceil((partidas?.length || 0) / pageSize));
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
@@ -195,13 +178,13 @@ export default function MinhasPartidasCompacta({
               ✕
             </button>
             <img
-              src={`http://localhost:3000/card/partida/${showCardId}`}
+              src={`${apiUrl}/card/partida/${showCardId}`}
               alt="Card da Partida"
               className="max-w-full max-h-[70vh] rounded mb-4"
             />
             <div className="text-center">
               <a
-                href={`http://localhost:3000/card/partida/${showCardId}`}
+                href={`${apiUrl}/card/partida/${showCardId}`}
                 download={`card_partida_${showCardId}.png`}
                 className="inline-block bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded"
               >
@@ -219,8 +202,8 @@ export default function MinhasPartidasCompacta({
         onClose={() => setNovaAberta(false)}
         onSuccess={() => {
           setNovaAberta(false);
-          onNovaPartida(); // recarrega lista no pai
-          setPage(1);      // recomeça na página 1 após criar
+          onNovaPartida();
+          setPage(1);
         }}
       />
     </div>

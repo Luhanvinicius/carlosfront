@@ -1,33 +1,12 @@
+// src/pages/Dashboard.tsx
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import EditarAtletaModal from "../components/EditarAtletaModal";
 import MinhasPartidas from "../components/MinhasPartidas";
 import MinhasPartidasCompacta from "../components/MinhasPartidasCompacta";
 import AtualizarPlacarModal from "../components/AtualizarPlacarModal";
 import GraficoEvolutivo from "../components/GraficoEvolutivo";
-
-interface Atleta {
-  id: string;
-  nome: string;
-  dataNascimento: string;
-  genero?: string;
-  fone?: string;
-  categoria?: string;
-}
-
-interface Partida {
-  id: string;
-  data: string;
-  local: string;
-  atleta1?: Atleta;
-  atleta2?: Atleta;
-  atleta3?: Atleta;
-  atleta4?: Atleta;
-  gamesTime1: number | null;
-  gamesTime2: number | null;
-  tiebreakTime1?: number | null;
-  tiebreakTime2?: number | null;
-}
+import { api } from "@/lib/api";
+import type { Atleta, Partida } from "@/types/domain";
 
 type Periodo = "all" | "30" | "90" | "365";
 
@@ -51,23 +30,21 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (token) {
-      buscarAtleta();
-    }
+    if (token) buscarAtleta();
   }, [token]);
 
   useEffect(() => {
-    if (token && atleta?.id) {
-      carregarPartidas();
-    }
+    if (token && atleta?.id) carregarPartidas();
   }, [token, atleta?.id]);
 
   const buscarAtleta = async () => {
     try {
-      const res = await axios.get("http://localhost:3000/atleta/me/atleta", {
+      console.log(token);
+      const res = await api.get("/atleta/me/atleta", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setAtleta(res.data);
+      setAtleta(res.data as Atleta | null);
+      console.log(atleta);
     } catch (error) {
       console.error("Erro ao buscar atleta", error);
     }
@@ -75,17 +52,17 @@ export default function Dashboard() {
 
   const carregarPartidas = async () => {
     if (!atleta?.id) return;
-
     try {
-      const res = await axios.get("http://localhost:3000/partida/listarPartidas", {
+      const res = await api.get("/partida/listarPartidas", {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const doAtleta = res.data
-        .filter((p: Partida) =>
+      const todas = res.data as Partida[];
+      const doAtleta = (todas || [])
+        .filter((p) =>
           [p.atleta1?.id, p.atleta2?.id, p.atleta3?.id, p.atleta4?.id].includes(atleta.id)
         )
-        .sort((a: Partida, b: Partida) => new Date(b.data).getTime() - new Date(a.data).getTime());
+        .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
       setPartidas(doAtleta);
     } catch (err) {
@@ -96,11 +73,8 @@ export default function Dashboard() {
   // filtra por período para o gráfico
   const partidasPeriodo = useMemo(() => {
     if (periodo === "all") return partidas;
-
     const days = Number(periodo);
-    const now = new Date().getTime();
-    const cutoff = now - days * 24 * 60 * 60 * 1000;
-
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
     return partidas.filter((p) => new Date(p.data).getTime() >= cutoff);
   }, [partidas, periodo]);
 
@@ -116,7 +90,7 @@ export default function Dashboard() {
             partidas={partidas}
             onAbrirTodas={() => setMostrarPartidas(true)}
             onAtualizarPlacar={(p) => {
-              setPartidaSelecionada(p);
+              setPartidaSelecionada(p); // agora Partida é o mesmo tipo
               setModalPlacar(true);
             }}
             onNovaPartida={carregarPartidas}
@@ -185,8 +159,16 @@ export default function Dashboard() {
             <MinhasPartidas
               token={token}
               atletaId={atleta.id}
+              partidas={partidas}
+              onAbrirTodas={() => setMostrarPartidas(false)} // ou navegar p/ página dedicada
+              onNovaPartida={carregarPartidas}
+              onAtualizarPlacar={(p) => {
+                setPartidaSelecionada(p);
+                setModalPlacar(true);
+              }}
             />
           )}
+
 
           {modalPlacar && partidaSelecionada && (
             <AtualizarPlacarModal
@@ -197,9 +179,7 @@ export default function Dashboard() {
                 setModalPlacar(false);
                 setPartidaSelecionada(null);
               }}
-              onSuccess={() => {
-                carregarPartidas();
-              }}
+              onSuccess={carregarPartidas}
             />
           )}
 

@@ -1,195 +1,99 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+// src/components/AtletaModal.tsx
+import { useState } from "react";
+import { api } from "@/lib/api";
+import type { FC } from "react";            // type-only p/ verbatimModuleSyntax
+import type { Atleta } from "@/types/domain"; // ajuste se seu tipo estiver em outro lugar
 
-interface Atleta {
-  id?: string;
-  nome: string;
-  dataNascimento: string;
-  genero?: string;
-  fone?: string;
-  categoria?: string;
-}
-
-type Mode = 'criar' | 'editar';
-
-interface AtletaModalProps {
-  atleta?: Atleta | null;
-  mode: Mode;
+type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
-  token: string;
-}
+  onSuccess?: () => void | Promise<void>;
+  atleta?: Atleta | null;            // opcional no modo "criar"
+  mode?: "criar" | "editar";         // restringe
+  /** DEPRECATED: Authorization vem do interceptor (BASIC/JWT) */
+  token?: string;
+};
 
-const AtletaModal = ({
-  atleta,
-  mode,
-  isOpen,
-  onClose,
-  onSuccess,
-  token,
-}: AtletaModalProps) => {
-  const [form, setForm] = useState({
-    nome: '',
-    dataNascimento: '',
-    genero: '',
-    fone: '',
-    categoria: '',
-  });
-
-  useEffect(() => {
-    if (mode === 'editar' && atleta) {
-      setForm({
-        nome: atleta.nome,
-        dataNascimento: atleta.dataNascimento.slice(0, 10),
-        genero: atleta.genero || '',
-        fone: atleta.fone || '',
-        categoria: atleta.categoria || '',
-      });
-    } else if (mode === 'criar') {
-      setForm({
-        nome: '',
-        dataNascimento: '',
-        genero: '',
-        fone: '',
-        categoria: '',
-      });
-    }
-  }, [mode, atleta]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-
-    if (name === 'fone') {
-      const masked = value
-        .replace(/\D/g, '')
-        .replace(/^(\d{2})(\d)/, '($1) $2')
-        .replace(/(\d{5})(\d)/, '$1-$2')
-        .slice(0, 15);
-      setForm({ ...form, fone: masked });
-    } else {
-      setForm({ ...form, [name]: value });
-    }
-  };
-
-  const handleSalvar = async () => {
-    try {
-      if (mode === 'editar' && atleta?.id) {
-        await axios.put(`http://localhost:3000/atleta/altera/${atleta.id}`, form, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-      } else if (mode === 'criar') {
-        console.log(form);
-        await axios.post('http://localhost:3000/atleta/CriarAtleta', form, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-      }
-
-      onSuccess();
-      onClose();
-    } catch (error) {
-      console.error(`Erro ao ${mode === 'criar' ? 'criar' : 'editar'} atleta`, error);
-    }
-  };
+const AtletaModal: FC<Props> = ({ isOpen, onClose, onSuccess, atleta, mode = "criar" }) => {
+  const [form, setForm] = useState<Partial<Atleta>>(() => ({
+    nome: atleta?.nome ?? "",
+    genero: atleta?.genero,
+    categoria: atleta?.categoria,
+    fone: atleta?.fone,
+    dataNascimento: atleta?.dataNascimento,
+  }));
+  const [saving, setSaving] = useState(false);
+  const [erro, setErro] = useState("");
 
   if (!isOpen) return null;
 
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setErro("");
+    try {
+      if (mode === "editar" && atleta?.id) {
+        await api.put(`/atleta/altera/${atleta.id}`, {
+          ...form,
+          genero: form.genero || undefined,
+          fone: form.fone || undefined,
+          categoria: form.categoria || undefined,
+          dataNascimento: form.dataNascimento || undefined,
+        }, { validateStatus: s => s >= 200 && s < 300 });
+      } else {
+        await api.post("/atleta/criar", {
+          ...form,
+          genero: form.genero || undefined,
+          fone: form.fone || undefined,
+          categoria: form.categoria || undefined,
+          dataNascimento: form.dataNascimento || undefined,
+        }, { validateStatus: s => s >= 200 && s < 300 });
+      }
+      await onSuccess?.();
+      onClose();
+    } catch (err: any) {
+      setErro(err?.response?.data?.mensagem || "Erro ao salvar atleta");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-40 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-2xl">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-          {mode === 'criar' ? 'Criar Perfil de Atleta' : 'Editar Atleta'}
-        </h2>
+    <div className="fixed inset-0 grid place-items-center bg-black/40 p-4">
+      <form onSubmit={submit} className="bg-white rounded-xl p-4 w-full max-w-md grid gap-3">
+        <h3 className="text-lg font-semibold">
+          {mode === "editar" ? "Editar perfil de atleta" : "Criar perfil de atleta"}
+        </h3>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div className="flex items-center">
-            <label className="w-32 font-medium text-gray-700">Nome</label>
-            <input
-              type="text"
-              name="nome"
-              value={form.nome}
-              onChange={handleChange}
-              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
+        <input
+          className="border rounded p-2"
+          placeholder="Nome"
+          value={form.nome ?? ""}
+          onChange={(e) => setForm(f => ({ ...f, nome: e.target.value }))}
+          required
+        />
+        <input
+          className="border rounded p-2"
+          placeholder="Categoria"
+          value={form.categoria ?? ""}
+          onChange={(e) => setForm(f => ({ ...f, categoria: e.target.value }))}
+        />
+        <input
+          className="border rounded p-2"
+          placeholder="Telefone"
+          value={form.fone ?? ""}
+          onChange={(e) => setForm(f => ({ ...f, fone: e.target.value }))}
+        />
 
-          <div className="flex items-center">
-            <label className="w-32 font-medium text-gray-700">Nascimento</label>
-            <input
-              type="date"
-              name="dataNascimento"
-              value={form.dataNascimento}
-              onChange={handleChange}
-              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
+        {erro && <p className="text-red-600 text-sm">{erro}</p>}
 
-          <div className="flex items-center">
-            <label className="w-32 font-medium text-gray-700">Gênero</label>
-            <select
-              name="genero"
-              value={form.genero}
-              onChange={handleChange}
-              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            >
-              <option value="">Selecione</option>
-              <option value="MASCULINO">Masculino</option>
-              <option value="FEMININO">Feminino</option>
-            </select>
-          </div>
-
-          <div className="flex items-center">
-            <label className="w-32 font-medium text-gray-700">Telefone</label>
-            <input
-              type="text"
-              name="fone"
-              value={form.fone}
-              onChange={handleChange}
-              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="(99) 99999-9999"
-            />
-          </div>
-
-          <div className="flex items-center">
-            <label className="w-32 font-medium text-gray-700">Categoria</label>
-            <select
-              name="categoria"
-              value={form.categoria}
-              onChange={handleChange}
-              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            >
-              <option value="">Selecione</option>
-              <option value="INICIANTE">Iniciante</option>
-              <option value="INTERMEDIARIO">Intermediário</option>
-              <option value="AVANCADO">Avançado</option>
-              <option value="PRO">Pro</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="flex justify-end mt-8 space-x-4">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={handleSalvar}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-          >
-            Salvar
+        <div className="flex gap-2 justify-end">
+          <button type="button" onClick={onClose} className="px-3 py-2 rounded border">Cancelar</button>
+          <button className="px-3 py-2 rounded bg-blue-600 text-white" disabled={saving || !(form.nome ?? "").trim()}>
+            {saving ? "Salvando..." : "Salvar"}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 };

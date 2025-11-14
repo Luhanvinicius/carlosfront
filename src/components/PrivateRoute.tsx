@@ -1,35 +1,41 @@
-import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { jwtDecode } from 'jwt-decode';
+// src/routes/PrivateRoute.tsx
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import type { ReactNode } from "react"; // ✅ tipo-only
+
+type Role = "ADMIN" | "USER" | string;
 
 type Props = {
-  children: React.ReactNode;
-  requiredRole?: string; // 'admin' | 'user' | etc
+  children: ReactNode;                 // ✅ usando o tipo importado
+  roles?: Role[];
+  role?: Role;                         // compat
+  requiredRole?: Role;                 // compat
+  loginRedirectTo?: string;
+  unauthorizedRedirectTo?: string;
 };
 
-type JwtPayload = {
-  id: number;
-  nome: string;
-  email: string;
-  role: string;
-  iat: number;
-  exp: number;
-};
+export default function PrivateRoute({
+  children,
+  roles,
+  role,
+  requiredRole,
+  loginRedirectTo = "/login",
+  unauthorizedRedirectTo = "/unauthorized",
+}: Props) {
+  const auth = useAuth() as any;
+  const { usuario } = auth;
 
-const PrivateRoute = ({ children, requiredRole }: Props) => {
-  const token = localStorage.getItem('token');
-  if (!token) return <Navigate to="/login" replace />;
+  const authReady: boolean | undefined =
+    typeof auth?.authReady === "boolean" ? auth.authReady : undefined;
+  if (authReady === false) return null;
 
-  try {
-    const payload = jwtDecode<JwtPayload>(token);
-    if (requiredRole && payload.role !== requiredRole) {
-      return <Navigate to="/unauthorized" replace />;
-    }
-    return <>{children}</>;
-  } catch {
-    localStorage.removeItem('token');
-    return <Navigate to="/login" replace />;
+  if (!usuario) return <Navigate to={loginRedirectTo} replace />;
+
+  const required = (roles && roles.length ? roles : [role, requiredRole].filter(Boolean)) as Role[];
+  if (required?.length) {
+    const allowed = required.includes(usuario.role as Role);
+    if (!allowed) return <Navigate to={unauthorizedRedirectTo} replace />;
   }
-};
 
-export default PrivateRoute;
+  return <>{children}</>;
+}

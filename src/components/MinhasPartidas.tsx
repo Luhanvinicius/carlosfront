@@ -1,36 +1,18 @@
 import { useState } from "react";
 import NovaPartidaModal from "./NovaPartidaModal";
-import AtualizarPlacarModal from "./AtualizarPlacarModal";
-
-interface Atleta {
-  id: string;
-  nome: string;
-}
-
-interface Partida {
-  id: string;
-  data: string;
-  local: string;
-  atleta1?: Atleta;
-  atleta2?: Atleta;
-  atleta3?: Atleta;
-  atleta4?: Atleta;
-  gamesTime1: number | null;
-  gamesTime2: number | null;
-  tiebreakTime1?: number | null;
-  tiebreakTime2?: number | null;
-}
+import type { Partida } from "@/types/domain";
+import { apiUrl } from "@/lib/url";
 
 interface Props {
   token: string;
   atletaId: string;
-  partidas: Partida[]; // já filtradas no pai
+  partidas: Partida[];
   onAbrirTodas: () => void;
   onNovaPartida: () => void;
   onAtualizarPlacar: (partida: Partida) => void;
 }
 
-export default function MinhasPartidasCompacta({
+export default function MinhasPartidas({
   token,
   atletaId,
   partidas,
@@ -44,8 +26,14 @@ export default function MinhasPartidasCompacta({
   const formatarPlacar = (p: Partida) => {
     if (p.gamesTime1 == null || p.gamesTime2 == null) return "Ainda não informado";
     let base = `${p.gamesTime1} x ${p.gamesTime2}`;
-    if (p.gamesTime1 === 6 && p.gamesTime2 === 6 && p.tiebreakTime1 != null && p.tiebreakTime2 != null) {
-      base += ` (${p.tiebreakTime1} x ${p.tiebreakTime2})`;
+    if (
+      (p.gamesTime1 === 6 && p.gamesTime2 === 6) ||
+      (p.gamesTime1 === 7 && p.gamesTime2 === 6) ||
+      (p.gamesTime1 === 6 && p.gamesTime2 === 7)
+    ) {
+      if (p.tiebreakTime1 != null && p.tiebreakTime2 != null) {
+        base += ` (${p.tiebreakTime1} x ${p.tiebreakTime2})`;
+      }
     }
     return base;
   };
@@ -58,7 +46,10 @@ export default function MinhasPartidasCompacta({
 
     if (p.gamesTime1 == null || p.gamesTime2 == null) return "⚪";
 
-    if (p.gamesTime1 === 6 && p.gamesTime2 === 6) {
+    if (
+      (p.gamesTime1 === 7 && p.gamesTime2 === 6) ||
+      (p.gamesTime1 === 6 && p.gamesTime2 === 7)
+    ) {
       if (p.tiebreakTime1 != null && p.tiebreakTime2 != null) {
         if (p.tiebreakTime1 > p.tiebreakTime2 && atletaNoTime1) return "🟢";
         if (p.tiebreakTime2 > p.tiebreakTime1 && atletaNoTime2) return "🟢";
@@ -79,7 +70,7 @@ export default function MinhasPartidasCompacta({
   return (
     <div className="bg-white rounded-xl shadow p-4">
       <div className="flex justify-between items-center mb-3">
-        <h2 className="text-lg font-semibold">Minhas Últimas Partidas</h2>
+        <h2 className="text-lg font-semibold">Minhas Partidas</h2>
         <div className="flex gap-3">
           <button
             onClick={() => setModalNovaAberto(true)}
@@ -91,7 +82,7 @@ export default function MinhasPartidasCompacta({
             onClick={onAbrirTodas}
             className="text-sm text-blue-600 hover:underline"
           >
-            Ver todas
+            Fechar
           </button>
         </div>
       </div>
@@ -100,12 +91,19 @@ export default function MinhasPartidasCompacta({
         <p className="text-sm text-gray-500">Você ainda não participou de nenhuma partida.</p>
       ) : (
         <ul className="space-y-3">
-          {partidas.slice(0, 5).map((p) => (
+          {partidas.map((p) => (
             <li key={p.id} className="border rounded p-3 text-sm">
               <div className="flex justify-between items-center mb-1">
                 <span>{resultadoEmoji(p)}</span>
                 <span className="text-gray-600">
-                  {new Date(p.data).toLocaleDateString("pt-BR")} - {p.local}
+                  {new Date(p.data).toLocaleString("pt-BR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                  {" - "}{p.local}
                 </span>
               </div>
               <div>
@@ -143,13 +141,13 @@ export default function MinhasPartidasCompacta({
               ✕
             </button>
             <img
-              src={`http://localhost:3000/partida/cardPromocional/${showCardId}/card`}
+              src={`${apiUrl}/card/partida/${showCardId}`}
               alt="Card da Partida"
               className="max-w-full max-h-[70vh] rounded mb-4"
             />
             <div className="text-center">
               <a
-                href={`http://localhost:3000/partida/cardPromocional/${showCardId}/card`}
+                href={`${apiUrl}/card/partida/${showCardId}`}
                 download={`card_partida_${showCardId}.png`}
                 className="inline-block bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded"
               >

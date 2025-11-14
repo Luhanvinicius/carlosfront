@@ -9,6 +9,7 @@ import {
   ReferenceLine,
   CartesianGrid,
 } from "recharts";
+import type { Payload } from "recharts/types/component/DefaultTooltipContent";
 
 interface Partida {
   id: string;
@@ -42,10 +43,8 @@ export default function GraficoEvolutivo({
   title = "Evolução do Atleta (sequência de jogos)",
 }: Props) {
   const dataChart = useMemo(() => {
-    // 1) Ordem base
     let base = partidas.map((p, idx) => ({ p, idx, ts: Date.parse(p.data) }));
     if (order === "date") {
-      // ordenação estável por data; NaN vai pro fim mantendo ordem original
       base.sort((a, b) => {
         const aNaN = Number.isNaN(a.ts);
         const bNaN = Number.isNaN(b.ts);
@@ -55,9 +54,8 @@ export default function GraficoEvolutivo({
         if (a.ts === b.ts) return a.idx - b.idx;
         return a.ts - b.ts;
       });
-    } // se "array", mantém a ordem recebida do pai
+    }
 
-    // 2) Constrói pontos
     let cumul = 0;
     const rows = base
       .map(({ p }, i) => {
@@ -84,7 +82,7 @@ export default function GraficoEvolutivo({
         const placar = isTB && tb1 != null && tb2 != null ? `${g1}x${g2} (${tb1}x${tb2})` : `${g1}x${g2}`;
 
         return {
-          idx: i + 1,                      // Jogo #1, #2, ...
+          idx: i + 1,
           id: p.id,
           local: p.local ?? "",
           placar,
@@ -113,7 +111,7 @@ export default function GraficoEvolutivo({
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={dataChart}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="idx" tickFormatter={(v) => `Jogo ${v}`} />
+          <XAxis dataKey="idx" tickFormatter={(v: number) => `Jogo ${v}`} />
           <YAxis />
           <ReferenceLine y={0} stroke="#999" />
           <Tooltip
@@ -122,21 +120,21 @@ export default function GraficoEvolutivo({
               if (name === "margin") return [value, "Margem da partida"];
               return [value, name];
             }}
-            labelFormatter={(_, payload: any[]) => {
-              const item = payload?.[0]?.payload;
+            labelFormatter={(_label: any, payload: readonly Payload<any, any>[]) => {
+              const item = payload?.[0]?.payload as
+                | { idx: number; local?: string; placar?: string }
+                | undefined;
               if (!item) return "";
-              return `Jogo ${item.idx} — ${item.local || "Local não informado"} — ${item.placar}`;
+              return `Jogo ${item.idx} — ${item.local || "Local não informado"} — ${item.placar ?? ""}`;
             }}
           />
-          {/* Linha 1: margem por jogo (oscila para cima/baixo) */}
           <Line type="linear" dataKey="margin" stroke="#94a3b8" strokeDasharray="4 4" dot={{ r: 2 }} />
-          {/* Linha 2: curva evolutiva (cumulativa por jogo) */}
           <Line type="monotone" dataKey="cumulative" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
         </LineChart>
       </ResponsiveContainer>
 
       <p className="text-xs text-gray-500 mt-2">
-        * Margem = diferença de games (positiva se vitória, negativa se derrota).  
+        * Margem = diferença de games (positiva se vitória, negativa se derrota).{" "}
         Em 7x6/6x7, aplica-se ajuste proporcional à diferença do tiebreak (peso {tbWeight}).
       </p>
     </div>

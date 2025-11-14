@@ -1,29 +1,16 @@
+// src/components/AtualizarPlacarModal.tsx
 import { Dialog } from "@headlessui/react";
 import { useState, useEffect } from "react";
-import axios from "axios";
+import { api } from "@/lib/api";
+import type { Partida } from "@/types/domain";
 
-interface Atleta {
-  id: string;
-  nome: string;
-}
-
-interface Partida {
-  id: string;
-  atleta1?: Atleta;
-  atleta2?: Atleta;
-  atleta3?: Atleta;
-  atleta4?: Atleta;
-  gamesTime1: number;
-  gamesTime2: number;
-}
-
-interface AtualizarPlacarModalProps {
+type AtualizarPlacarModalProps = {
   isOpen: boolean;
-  partida?: Partida;
+  partida?: Partida;     // agora aceita number | null (tipo do domínio)
   token: string;
   onClose: () => void;
   onSuccess: () => void;
-}
+};
 
 export default function AtualizarPlacarModal({
   isOpen,
@@ -34,82 +21,95 @@ export default function AtualizarPlacarModal({
 }: AtualizarPlacarModalProps) {
   if (!partida) return null;
 
-  const [gamesTime1, setGamesTime1] = useState<number>(partida.gamesTime1 ?? 0);
-  const [gamesTime2, setGamesTime2] = useState<number>(partida.gamesTime2 ?? 0);
-  const [tiebreakTime1, setTiebreakTime1] = useState<number | null>(null);
-  const [tiebreakTime2, setTiebreakTime2] = useState<number | null>(null);
+  // inputs como string: permitem vazio e evitam NaN na digitação
+  const [g1, setG1] = useState<string>("");
+  const [g2, setG2] = useState<string>("");
+  const [tb1, setTb1] = useState<string>("");
+  const [tb2, setTb2] = useState<string>("");
 
   useEffect(() => {
     if (isOpen && partida) {
-      setGamesTime1(partida.gamesTime1 ?? 0);
-      setGamesTime2(partida.gamesTime2 ?? 0);
-      setTiebreakTime1(null);
-      setTiebreakTime2(null);
+      setG1(partida.gamesTime1 != null ? String(partida.gamesTime1) : "");
+      setG2(partida.gamesTime2 != null ? String(partida.gamesTime2) : "");
+      setTb1(partida.tiebreakTime1 != null ? String(partida.tiebreakTime1) : "");
+      setTb2(partida.tiebreakTime2 != null ? String(partida.tiebreakTime2) : "");
     }
   }, [isOpen, partida]);
 
+  const numOrNull = (s: string): number | null =>
+    s.trim() === "" ? null : Number(s);
+
+  const g1Num = numOrNull(g1);
+  const g2Num = numOrNull(g2);
+  const tb1Num = numOrNull(tb1);
+  const tb2Num = numOrNull(tb2);
+
+  const isTiebreak =
+    g1Num != null &&
+    g2Num != null &&
+    ((g1Num === 7 && g2Num === 6) || (g1Num === 6 && g2Num === 7));
+
+  const time1Label = `${partida.atleta1?.nome || "—"} / ${partida.atleta2?.nome || "—"}`;
+  const time2Label = `${partida.atleta3?.nome || "—"} / ${partida.atleta4?.nome || "—"}`;
+
   const handleSalvar = async () => {
-    if (gamesTime1 == null || gamesTime2 == null) {
-      alert("Informe o placar de games.");
+    // validações básicas (mesmas ideias do backend, resumidas no front)
+    if (g1Num == null || g2Num == null) {
+      alert("Informe o placar de games (ambos os lados).");
       return;
     }
 
-    if (gamesTime1 === 6 && gamesTime2 === 6) {
+    if (g1Num === 6 && g2Num === 6) {
       alert("Placar 6x6 não é permitido. Use 7x6 ou 6x7 com tiebreak.");
       return;
     }
 
-    const isTiebreak =
-      (gamesTime1 === 7 && gamesTime2 === 6) ||
-      (gamesTime1 === 6 && gamesTime2 === 7);
-
     if (isTiebreak) {
-      if (tiebreakTime1 == null || tiebreakTime2 == null) {
+      if (tb1Num == null || tb2Num == null) {
         alert("Informe o placar do tiebreak.");
         return;
       }
-
-      const v1 = tiebreakTime1;
-      const v2 = tiebreakTime2;
-      const vencedor = Math.max(v1, v2);
-      const perdedor = Math.min(v1, v2);
-      const diff = vencedor - perdedor;
-
-      if (vencedor < 7) {
+      const maior = Math.max(tb1Num, tb2Num);
+      const diff = Math.abs(tb1Num - tb2Num);
+      if (maior < 7) {
         alert("O tiebreak deve ir até pelo menos 7 pontos.");
         return;
       }
-
       if (diff < 2) {
         alert("O tiebreak precisa de pelo menos 2 pontos de diferença.");
         return;
       }
     } else {
-      const vencedor = Math.max(gamesTime1, gamesTime2);
-      const perdedor = Math.min(gamesTime1, gamesTime2);
-      const diff = vencedor - perdedor;
+      // sem tiebreak: 6–0..6–4 (dif ≥ 2) ou 7–5
+      const vencedor = Math.max(g1Num, g2Num);
+      const perdedor = Math.min(g1Num, g2Num);
+      const dif = vencedor - perdedor;
 
-      if (vencedor > 7 || diff < 2) {
-        alert("Placar inválido: o vencedor deve ter no máximo 7 games e pelo menos 2 de vantagem.");
+      const validoSemTB =
+        (vencedor === 6 && dif >= 2) ||
+        (vencedor === 7 && ((g1Num === 7 && g2Num === 5) || (g2Num === 7 && g1Num === 5)));
+
+      if (!validoSemTB) {
+        alert("Sem tiebreak, o válido é 6–0..6–4 (dif ≥2) ou 7–5.");
         return;
       }
 
-      if (tiebreakTime1 || tiebreakTime2) {
+      if (tb1Num != null || tb2Num != null) {
         alert("Tiebreak só deve ser informado em caso de 7x6 ou 6x7.");
         return;
       }
     }
 
     try {
-      await axios.put(
-        `http://localhost:3000/partida/atualizarPlacar/${partida.id}/placar`,
+      await api.put(
+        `/partida/atualizarPlacar/${partida.id}/placar`,
         {
-          gamesTime1,
-          gamesTime2,
-          tiebreakTime1,
-          tiebreakTime2,
+          gamesTime1: g1Num,
+          gamesTime2: g2Num,
+          tiebreakTime1: isTiebreak ? tb1Num : null,
+          tiebreakTime2: isTiebreak ? tb2Num : null,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } } // remova se usa interceptor
       );
       onSuccess();
       onClose();
@@ -118,12 +118,6 @@ export default function AtualizarPlacarModal({
       alert("Erro ao atualizar placar");
     }
   };
-
-  const time1Label = `${partida.atleta1?.nome || "—"} / ${partida.atleta2?.nome || "—"}`;
-  const time2Label = `${partida.atleta3?.nome || "—"} / ${partida.atleta4?.nome || "—"}`;
-  const mostrarTiebreak =
-    (gamesTime1 === 7 && gamesTime2 === 6) ||
-    (gamesTime1 === 6 && gamesTime2 === 7);
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
@@ -137,9 +131,11 @@ export default function AtualizarPlacarModal({
               <label className="block font-medium mb-1">{time1Label}</label>
               <input
                 type="number"
-                value={gamesTime1}
-                onChange={(e) => setGamesTime1(Number(e.target.value))}
+                inputMode="numeric"
+                value={g1}
+                onChange={(e) => setG1(e.target.value)}
                 className="w-full border rounded px-3 py-2"
+                placeholder="Games do time 1"
               />
             </div>
 
@@ -147,21 +143,25 @@ export default function AtualizarPlacarModal({
               <label className="block font-medium mb-1">{time2Label}</label>
               <input
                 type="number"
-                value={gamesTime2}
-                onChange={(e) => setGamesTime2(Number(e.target.value))}
+                inputMode="numeric"
+                value={g2}
+                onChange={(e) => setG2(e.target.value)}
                 className="w-full border rounded px-3 py-2"
+                placeholder="Games do time 2"
               />
             </div>
 
-            {mostrarTiebreak && (
+            {isTiebreak && (
               <>
                 <div>
                   <label className="block font-medium mb-1">Tiebreak {time1Label}</label>
                   <input
                     type="number"
-                    value={tiebreakTime1 ?? ''}
-                    onChange={(e) => setTiebreakTime1(Number(e.target.value))}
+                    inputMode="numeric"
+                    value={tb1}
+                    onChange={(e) => setTb1(e.target.value)}
                     className="w-full border rounded px-3 py-2"
+                    placeholder="Pontos do tiebreak (time 1)"
                   />
                 </div>
 
@@ -169,9 +169,11 @@ export default function AtualizarPlacarModal({
                   <label className="block font-medium mb-1">Tiebreak {time2Label}</label>
                   <input
                     type="number"
-                    value={tiebreakTime2 ?? ''}
-                    onChange={(e) => setTiebreakTime2(Number(e.target.value))}
+                    inputMode="numeric"
+                    value={tb2}
+                    onChange={(e) => setTb2(e.target.value)}
                     className="w-full border rounded px-3 py-2"
+                    placeholder="Pontos do tiebreak (time 2)"
                   />
                 </div>
               </>

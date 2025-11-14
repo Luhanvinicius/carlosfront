@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { api } from "@/lib/api";
 
 interface Usuario {
   id: number;
@@ -25,7 +24,7 @@ export default function Usuarios() {
   const fetchUsuarios = async () => {
     try {
       setCarregando(true);
-      const response = await axios.get('http://localhost:3000/user/list', {
+      const response = await api.get('/user/list', {
         headers: {
           Authorization: `Bearer ${token}`,
         },

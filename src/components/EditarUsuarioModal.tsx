@@ -1,6 +1,6 @@
 import { Dialog, Transition } from '@headlessui/react';
 import { Fragment, useEffect, useState } from 'react';
-import axios from 'axios';
+import { api } from "@/lib/api";
 
 interface EditarUsuarioModalProps {
   isOpen: boolean;
@@ -40,8 +40,8 @@ export default function EditarUsuarioModal({
     setErro('');
 
     try {
-      await axios.put(
-        `http://localhost:3000/user/perfil`,
+      await api.put(
+        `/user/perfil`,
         { id, name, password },
         {
           headers: {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Dialog } from '@headlessui/react';
 
+
 interface Atleta {
   id: string;
   nome: string;
@@ -23,7 +24,7 @@ interface AtualizarFotoModalProps {
 export default function AtualizarFotoModal({ atleta, isOpen, onClose, onAtualizado, token }: AtualizarFotoModalProps) {
   const [novaFoto, setNovaFoto] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const VITE_API_URL = import.meta.env.VITE_API_URL;
+  const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3000";
 
   useEffect(() => {
   }, [isOpen, atleta]);
@@ -38,7 +39,7 @@ export default function AtualizarFotoModal({ atleta, isOpen, onClose, onAtualiza
       const formData = new FormData();
       formData.append('foto', novaFoto);
 
-      await fetch(`${VITE_API_URL}/atleta/alteraFoto/${atleta.id}/foto`, {
+      await fetch(`${API_BASE}/atleta/alteraFoto/${atleta.id}/foto`, {
         method: 'PUT',
         body: formData,
         headers: { Authorization: `Bearer ${token}` },

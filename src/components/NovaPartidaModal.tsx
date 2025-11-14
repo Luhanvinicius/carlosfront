@@ -1,6 +1,6 @@
 import { Dialog } from "@headlessui/react";
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { api } from "@/lib/api";
 
 interface Atleta {
   id: string;
@@ -36,7 +36,7 @@ export default function NovaPartidaModal({
 
   const carregarAtletas = async () => {
     try {
-      const response = await axios.get("http://localhost:3000/atleta/listarAtletasPaginados", {
+      const response = await api.get("/atleta/listarAtletasPaginados", {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (Array.isArray(response.data)) {
@@ -96,8 +96,8 @@ export default function NovaPartidaModal({
     const dataHoraLocal = `${form.data}T${form.hora}:00`;
 
     try {
-      await axios.post(
-        "http://localhost:3000/partida/criarPartida",
+      await api.post(
+        "/partida/criarPartida",
         {
           ...form,
           data: dataHoraLocal, // 👈 envia data+hora combinadas

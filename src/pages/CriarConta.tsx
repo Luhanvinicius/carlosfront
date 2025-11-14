@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { api } from "@/lib/api";
 
 const CriarConta = () => {
   const [name, setNome] = useState('');
@@ -18,7 +18,7 @@ const CriarConta = () => {
     }
 
     try {
-      await axios.post('http://localhost:3000/auth/register', {
+      await api.post('/auth/register', {
         name,
         email,
         password,
