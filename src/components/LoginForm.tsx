@@ -14,7 +14,7 @@ type JwtPayload = {
   exp?: number;
 };
 
-const AUTH_MODE = (import.meta.env.VITE_AUTH_MODE || "JWT").toUpperCase();
+const AUTH_MODE = (import.meta.env.VITE_AUTH_MODE || "BASIC").toUpperCase();
 
 function getRedirectRoute(role: string): string {
   if (role === "ADMIN") return "/dashboard";
@@ -50,27 +50,42 @@ useEffect(() => {
 
     try {
       const { data } = await api.post("/auth/login", { email, password });
-      const { token, usuario } = data; // backend já envia `usuario` no BASIC e no JWT (conforme sugerido)
-
-      localStorage.setItem("token", token);
-
+      
       if (AUTH_MODE === "BASIC") {
-        // 1) Não decodifica token fake
-        // 2) Seta usuario vindo do backend
-        // 3) Injeta credenciais no axios (apenas em memória)
+        // Backend retorna apenas { user } no modo BASIC (sem token)
+        const user = data.user || data.usuario;
         
-        const usuarioFinal = usuario as JwtPayload;
-        console.log(usuarioFinal);
+        if (!user) {
+          setErro("Resposta do servidor inválida");
+          return;
+        }
 
+        const usuarioFinal = {
+          id: user.id,
+          name: user.name || user.nome,
+          email: user.email,
+          role: user.role,
+          atletaId: user.atletaId || null,
+        } as JwtPayload;
+
+        // Seta usuario e credenciais
         setUsuario(usuarioFinal);
-        localStorage.setItem("usuario", JSON.stringify(usuarioFinal)); // ajuda a reidratar após refresh
+        localStorage.setItem("usuario", JSON.stringify(usuarioFinal));
+        localStorage.setItem("token", "basic-mode"); // Placeholder para compatibilidade
         setBasicCreds({ email: email.trim().toLowerCase(), senha: password });
 
         navigate(getRedirectRoute(usuarioFinal.role), { replace: true });
         return;
       }
 
-      // JWT: decodifica normalmente
+      // JWT: backend retorna { token, user }
+      const { token, user, usuario } = data;
+      if (!token) {
+        setErro("Token não recebido do servidor");
+        return;
+      }
+
+      localStorage.setItem("token", token);
       const decoded = jwtDecode<JwtPayload>(token);
       setUsuario(decoded);
       navigate(getRedirectRoute(decoded.role));
