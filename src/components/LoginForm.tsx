@@ -79,7 +79,7 @@ useEffect(() => {
       }
 
       // JWT: backend retorna { token, user }
-      const { token, user, usuario } = data;
+      const { token } = data;
       if (!token) {
         setErro("Token não recebido do servidor");
         return;
